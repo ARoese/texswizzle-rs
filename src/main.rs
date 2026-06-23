@@ -1,4 +1,7 @@
-use crate::hd2_pbr::{default_pbr_channel, AdvancedPBR, AoMap, BasicPBR, EmissiveMap, MetallicMap, NormalMap, RoughnessMap};
+use crate::hd2_pbr::{
+    AdvancedPBR, AoMap, BasicPBR, EmissiveMap, MetallicMap, NormalMap, RoughnessMap,
+    default_pbr_channel,
+};
 use clap::Parser;
 use colored::Colorize;
 use image::{GrayImage, ImageFormat, ImageReader, RgbImage};
@@ -37,15 +40,15 @@ const HELP_EXAMPLES: &str =
 ///
 /// Use the --metallic, --normal, --roughness, --ao, and --emissive options
 /// to provide textures that will be swizzled. Use --basic or --advanced to
-/// produce a basic or advanced pbr respectively. 
-/// 
-/// Any required texture that is omitted will instead use a sensible default. 
-/// For example, omitting the --normal option when creating an --advanced PBR 
-/// will behave as if an all-flat normal was provided. All-flat means 
+/// produce a basic or advanced pbr respectively.
+///
+/// Any required texture that is omitted will instead use a sensible default.
+/// For example, omitting the --normal option when creating an --advanced PBR
+/// will behave as if an all-flat normal was provided. All-flat means
 /// \[128, 128, 255] pixel values.
-/// 
+///
 /// Textures do not have to be the same size. The output will be the same dimensions
-/// as the largest input, and the smaller inputs will be upscaled using the 'nearest' 
+/// as the largest input, and the smaller inputs will be upscaled using the 'nearest'
 /// sampling method.
 struct Cli {
     #[arg(short, long, value_parser = verify_file)]
@@ -64,13 +67,12 @@ struct Cli {
     /// path to emissive map texture
     emissive: Option<PathBuf>,
 
-    #[arg(long, short, group="tt")]
+    #[arg(long, short, group = "tt")]
     /// output a PBR for the basic material using metallic, roughness, ao, and emissive textures
     basic: bool,
-    #[arg(long, short, group="tt")]
+    #[arg(long, short, group = "tt")]
     /// output a PBR for the advanced material using normal, ao, and roughness textures
     advanced: bool,
-
 
     #[arg(long, short = 'y')]
     /// overwrite output file if it exists; do not prompt.
@@ -132,29 +134,25 @@ impl From<&Cli> for AvailableChannels {
         let mut channels = AvailableChannels::default();
 
         if let Some(channel_p) = &cli.metallic {
-            channels.metallic.replace(
-                MetallicMap(open_as_greyscale(channel_p))
-            );
+            channels
+                .metallic
+                .replace(MetallicMap(open_as_greyscale(channel_p)));
         }
         if let Some(channel_p) = &cli.normal {
-            channels.normal.replace(
-                NormalMap(open_as_rgb(channel_p))
-            );
+            channels.normal.replace(NormalMap(open_as_rgb(channel_p)));
         }
         if let Some(channel_p) = &cli.roughness {
-            channels.roughness.replace(
-                RoughnessMap(open_as_greyscale(channel_p))
-            );
+            channels
+                .roughness
+                .replace(RoughnessMap(open_as_greyscale(channel_p)));
         }
         if let Some(channel_p) = &cli.ao {
-            channels.ao.replace(
-                AoMap(open_as_greyscale(channel_p))
-            );
+            channels.ao.replace(AoMap(open_as_greyscale(channel_p)));
         }
         if let Some(channel_p) = &cli.emissive {
-            channels.emissive.replace(
-                EmissiveMap(open_as_greyscale(channel_p))
-            );
+            channels
+                .emissive
+                .replace(EmissiveMap(open_as_greyscale(channel_p)));
         }
 
         channels
@@ -177,41 +175,45 @@ fn assemble_textures(cli: &Cli) -> AvailableChannels {
     let mut channels = AvailableChannels::from(cli);
 
     fn try_infer_texture(path: &Path, available_channels: &mut AvailableChannels) {
-        let file_name_cased = path.file_name().expect("directories would already be rejected").to_string_lossy();
+        let file_name_cased = path
+            .file_name()
+            .expect("directories would already be rejected")
+            .to_string_lossy();
         let file_name = file_name_cased.to_lowercase();
-        let file_base_name = file_name.rsplit_once(".").unwrap_or((file_name.as_ref(), "")).0;
+        let file_base_name = file_name
+            .rsplit_once(".")
+            .unwrap_or((file_name.as_ref(), ""))
+            .0;
         // TOOD: print out these inferences
         if file_base_name.ends_with("roughness") {
             println!("Taking '{file_name}' as Roughness map.");
-            available_channels.roughness.replace(
-                RoughnessMap(open_as_greyscale(&path))
-            );
-        }else if file_base_name.ends_with("metallic") {
+            available_channels
+                .roughness
+                .replace(RoughnessMap(open_as_greyscale(path)));
+        } else if file_base_name.ends_with("metallic") {
             println!("Taking '{file_name}' as Metallic map.");
-            available_channels.metallic.replace(
-                MetallicMap(open_as_greyscale(&path))
-            );
-        }else if file_base_name.ends_with("ao") {
+            available_channels
+                .metallic
+                .replace(MetallicMap(open_as_greyscale(path)));
+        } else if file_base_name.ends_with("ao") {
             println!("Taking '{file_name}' as AO map.");
-            available_channels.ao.replace(
-                AoMap(open_as_greyscale(&path))
-            );
-        }else if file_base_name.ends_with("emissive") {
+            available_channels
+                .ao
+                .replace(AoMap(open_as_greyscale(path)));
+        } else if file_base_name.ends_with("emissive") {
             println!("Taking '{file_name}' as Emissive map.");
-            available_channels.emissive.replace(
-                EmissiveMap(open_as_greyscale(&path))
-            );
-        }else if file_base_name.ends_with("normal") {
+            available_channels
+                .emissive
+                .replace(EmissiveMap(open_as_greyscale(path)));
+        } else if file_base_name.ends_with("normal") {
             println!("Taking '{file_name}' as Normal map.");
-            available_channels.normal.replace(
-                NormalMap(open_as_rgb(&path))
-            );
-        }else {
-            write_warning(
-                &format!(
-                    "Cannot infer type of '{file_name}'. Try adding any of the following to the end of its name:\n\troughness\n\tmetallic\n\tao\n\temissive\n\tnormal"
-                )
-            );
+            available_channels
+                .normal
+                .replace(NormalMap(open_as_rgb(path)));
+        } else {
+            write_warning(&format!(
+                "Cannot infer type of '{file_name}'. Try adding any of the following to the end of its name:\n\troughness\n\tmetallic\n\tao\n\temissive\n\tnormal"
+            ));
         }
     }
 
@@ -221,8 +223,12 @@ fn assemble_textures(cli: &Cli) -> AvailableChannels {
         }
     }
 
-    if cli.convert_normal && let Some(normal) = channels.normal {
-        println!("Inverting green channel of normal map to convert between OpenGL and DirectX normal maps");
+    if cli.convert_normal
+        && let Some(normal) = channels.normal
+    {
+        println!(
+            "Inverting green channel of normal map to convert between OpenGL and DirectX normal maps"
+        );
         channels.normal = Some(normal.flipped());
     }
 
@@ -243,84 +249,111 @@ pub fn main() {
     let textures = assemble_textures(&cli);
 
     let image_format = ImageFormat::from_path(&cli.output).unwrap_or_else(|e| {
-        let extension = cli.output.extension()
+        let extension = cli
+            .output
+            .extension()
             .map(|ext| ext.to_string_lossy())
             .unwrap_or("Unknown file type".into());
-        write_err(&format!("This program does not support writing '{}' files: {e}", extension));
+        write_err(&format!(
+            "This program does not support writing '{}' files: {e}",
+            extension
+        ));
         exit(1);
     });
 
     if cli.output.exists() && !cli.overwrite {
-        let overwrite= Confirm::new("The output file already exists. Overwrite?")
-            .prompt().unwrap_or(false);
+        let overwrite = Confirm::new("The output file already exists. Overwrite?")
+            .prompt()
+            .unwrap_or(false);
         if !overwrite {
             println!("Refusing to overwrite. Exiting...");
             exit(0);
-        }else{
+        } else {
             println!("Overwriting.");
         }
     }
 
     if cli.output.is_dir() {
-        write_err(&"Output path is a directory.");
+        write_err("Output path is a directory.");
         exit(1);
     }
 
     if let Some(parent_dir) = cli.output.parent() {
         std::fs::create_dir_all(parent_dir).unwrap_or_else(|e| {
-            write_err(&format!("Cannot create output directory: '{}': {e}", parent_dir.display()));
+            write_err(&format!(
+                "Cannot create output directory: '{}': {e}",
+                parent_dir.display()
+            ));
             exit(1);
         });
     }
 
-    let output_file = OpenOptions::new().write(true).create(true).open(&cli.output).unwrap_or_else(|e| {
-        write_err(&format!("Cannot open output file: '{}': {e}", cli.output.display()));
-        exit(1);
-    });
+    let output_file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&cli.output)
+        .unwrap_or_else(|e| {
+            write_err(&format!(
+                "Cannot open output file: '{}': {e}",
+                cli.output.display()
+            ));
+            exit(1);
+        });
     let mut output_writer = BufWriter::new(output_file);
 
     if cli.basic {
         let metallic = &textures.metallic.unwrap_or_else(|| {
-            write_warning(&"Using default all-black for metallic texture.");
+            write_warning("Using default all-black for metallic texture.");
             default_pbr_channel(0).into()
         });
         let roughness = &textures.roughness.unwrap_or_else(|| {
-            write_warning(&"Using default all-white for roughness texture.");
+            write_warning("Using default all-white for roughness texture.");
             default_pbr_channel(255).into()
         });
         let ao = &textures.ao.unwrap_or_else(|| {
-            write_warning(&"Using default all-white for AO texture.");
+            write_warning("Using default all-white for AO texture.");
             default_pbr_channel(255).into()
         });
         let emissive = &textures.emissive.unwrap_or_else(|| {
-            write_warning(&"Using default all-white for emissive texture.");
+            write_warning("Using default all-white for emissive texture.");
             default_pbr_channel(255).into()
         });
         let basic = BasicPBR::new(metallic, roughness, ao, emissive);
 
-        basic.write_to(&mut output_writer, image_format).unwrap_or_else(|e| {
-            write_err(&format!("Failed to write output file: '{}': {e}", cli.output.display()));
-            exit(1);
-        });
+        basic
+            .write_to(&mut output_writer, image_format)
+            .unwrap_or_else(|e| {
+                write_err(&format!(
+                    "Failed to write output file: '{}': {e}",
+                    cli.output.display()
+                ));
+                exit(1);
+            });
     } else if cli.advanced {
         let normal = &textures.normal.unwrap_or_else(|| {
             write_warning("Using default all-flat normal texture.");
             NormalMap::default()
         });
         let ao = &textures.ao.unwrap_or_else(|| {
-            write_warning(&"Using default all-white for AO texture.");
+            write_warning("Using default all-white for AO texture.");
             default_pbr_channel(255).into()
         });
         let roughness = &textures.roughness.unwrap_or_else(|| {
-            write_warning(&"Using default all-white for roughness texture.");
+            write_warning("Using default all-white for roughness texture.");
             default_pbr_channel(255).into()
         });
 
         let advanced = AdvancedPBR::new(normal, ao, roughness);
-        advanced.write_to(&mut output_writer, image_format).unwrap_or_else(|e| {
-            write_err(&format!("Failed to write output file: '{}': {e}", cli.output.display()));
-            exit(1);
-        });
+        advanced
+            .write_to(&mut output_writer, image_format)
+            .unwrap_or_else(|e| {
+                write_err(&format!(
+                    "Failed to write output file: '{}': {e}",
+                    cli.output.display()
+                ));
+                exit(1);
+            });
     } else {
         write_err("Do not know which texture to swizzle to!");
         exit(1)
