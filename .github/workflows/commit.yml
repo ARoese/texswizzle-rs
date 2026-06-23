@@ -3,36 +3,6 @@ on: [push, pull_request]
 name: Continuous integration
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact-name: "texswizzle"
-            binary-path: "target/release/texswizzle"
-          - os: windows-latest
-            artifact-name: "texswizzle.exe"
-            binary-path: "target/release/texswizzle"
-
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --all-features
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact-name }}
-          path: ${{ matrix.binary-path }}
-
   check:
     name: Check
     runs-on: ubuntu-latest
@@ -43,6 +13,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - uses: Swatinem/rust-cache@v2
       - uses: actions-rs/cargo@v1
         with:
           command: check
@@ -57,6 +28,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - uses: Swatinem/rust-cache@v2
       - uses: actions-rs/cargo@v1
         with:
           command: test
@@ -72,6 +44,7 @@ jobs:
           toolchain: stable
           override: true
       - run: rustup component add rustfmt
+      - uses: Swatinem/rust-cache@v2
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
@@ -88,6 +61,7 @@ jobs:
           toolchain: stable
           override: true
       - run: rustup component add clippy
+      - uses: Swatinem/rust-cache@v2
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
