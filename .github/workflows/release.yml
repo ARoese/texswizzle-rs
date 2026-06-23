@@ -1,4 +1,6 @@
-on: [release]
+on:
+  release:
+    types: [created]
 
 name: Build
 
@@ -16,7 +18,7 @@ jobs:
             binary-path: "target/release/texswizzle"
           - os: windows-latest
             artifact-name: "texswizzle.exe"
-            binary-path: "target/release/texswizzle"
+            binary-path: "target/release/texswizzle.exe"
 
 
     steps:
