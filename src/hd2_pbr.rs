@@ -210,11 +210,10 @@ mod test {
                 .decode()?
                 .into_rgb8(),
         );
-        let normal = NormalMap::default();
         let ao = ImageReader::open(test_folder.join("HELMAO.png"))?
             .decode()?
             .into_luma8();
-        let ao = AoMap(ao);
+        let _ao = AoMap(ao);
         let roughness = ImageReader::open(test_folder.join("HELMR.png"))?
             .decode()?
             .into_luma8();
