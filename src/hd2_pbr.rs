@@ -86,7 +86,9 @@ impl NormalMap {
 
 impl Default for NormalMap {
     fn default() -> Self {
-        let default = RgbImage::from_fn(DEFAULT_TEXTURE_DIM, DEFAULT_TEXTURE_DIM, |_, _| Rgb([128, 128, 255]));
+        let default = RgbImage::from_fn(DEFAULT_TEXTURE_DIM, DEFAULT_TEXTURE_DIM, |_, _| {
+            Rgb([128, 128, 255])
+        });
 
         NormalMap(default)
     }
@@ -105,7 +107,9 @@ pub struct MetallicMap(pub GrayImage);
 pub struct EmissiveMap(pub GrayImage);
 
 pub fn default_pbr_channel(value: u8) -> GrayImage {
-    GrayImage::from_fn(DEFAULT_TEXTURE_DIM, DEFAULT_TEXTURE_DIM, |_, _| Luma([value]))
+    GrayImage::from_fn(DEFAULT_TEXTURE_DIM, DEFAULT_TEXTURE_DIM, |_, _| {
+        Luma([value])
+    })
 }
 
 #[derive(NewType)]

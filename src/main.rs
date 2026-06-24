@@ -4,13 +4,16 @@ use crate::hd2_pbr::{
 };
 use clap::Parser;
 use colored::Colorize;
+use enum_display::EnumDisplay;
 use image::{GrayImage, ImageFormat, ImageReader, RgbImage};
-use inquire::Confirm;
+use inquire::validator::{ErrorMessage, Validation};
+use inquire::{Confirm, Select};
 use std::error::Error;
 use std::fs::OpenOptions;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::process::exit;
+use strum::{EnumIter, IntoEnumIterator};
 
 mod hd2_pbr;
 
@@ -24,7 +27,7 @@ const HELP_EXAMPLES: &str =
         texswizzle-rs --ao AOMap.png --roughness Roughness.png --advanced advanced_pbr.png
 ";
 
-#[derive(Parser)]
+#[derive(Parser, Default)]
 #[clap(
     group(
         clap::ArgGroup::new("tt")
@@ -88,8 +91,14 @@ struct Cli {
     /// Textures should generally be passed using the respective options,
     /// but you can use this if you're lazy and confident.
     infer_textures: Option<Vec<PathBuf>>,
+
+    #[arg(required_unless_present = "interactive", default_value = "/")]
     /// output file path. Image type is inferred from the file extension.
     output: PathBuf,
+    
+    #[arg(long, group = "tt", conflicts_with("output"))]
+    /// instead of taking textures from cli args, prompt for each required texture
+    interactive: bool,
 }
 
 pub fn open_as_greyscale(image_path: &Path) -> GrayImage {
@@ -236,7 +245,8 @@ fn assemble_textures(cli: &Cli) -> AvailableChannels {
 }
 
 fn write_err(error_string: &str) {
-    eprintln!("Error: {}", error_string.bright_red().bold());
+    let err = format!("Error: {error_string}");
+    eprintln!("{}", err.bright_red().bold());
 }
 
 fn write_warning(warning_string: &str) {
@@ -244,21 +254,130 @@ fn write_warning(warning_string: &str) {
     println!("{}", warning_string.bright_yellow().bold());
 }
 
+fn pathbuf_from_user_string(user_string: &str) -> PathBuf {
+    user_string
+        .trim_start_matches('"')
+        .trim_end_matches('"')
+        .into()
+}
+
+fn validate_path_exists(input: &str) -> Result<Validation, Box<dyn Error + Sync + Send>> {
+    let path = pathbuf_from_user_string(input);
+    if path.exists() {
+        Ok(Validation::Valid)
+    } else {
+        Ok(Validation::Invalid(ErrorMessage::from(
+            "Path does not exist",
+        )))
+    }
+}
+
+fn validate_path_has_file_name(input: &str) -> Result<Validation, Box<dyn Error + Sync + Send>> {
+    let path = pathbuf_from_user_string(input);
+    if path.file_name().is_some() {
+        Ok(Validation::Valid)
+    } else {
+        Ok(Validation::Invalid(ErrorMessage::from(
+            "Path must have a file name",
+        )))
+    }
+}
+
+fn prompt_for_texture_path(texture_name: &str, validate_exists: bool) -> Option<PathBuf> {
+    let inquire_prompt = format!("Provide the path for the {} texture: ", texture_name.bold());
+    let mut inquire =
+        inquire::Text::new(&inquire_prompt).with_validator(validate_path_has_file_name);
+
+    let prompt_result = if validate_exists {
+        inquire = inquire.with_validator(validate_path_exists);
+        inquire.prompt().ok()
+    } else {
+        inquire.prompt_skippable().unwrap_or(None)
+    };
+
+    let path = prompt_result?;
+
+    Some(pathbuf_from_user_string(&path))
+}
+
+/// collect cli arguments interactively
+fn interactive_cli(cli: &mut Cli) -> bool {
+    println!(
+        "{}",
+        "Running in interactive mode. Pass --help for cli usage".bold()
+    );
+    println!(
+        "{}",
+        "Hint: On most systems, you can drag the texture file onto the window to paste its path."
+            .cyan()
+    );
+    println!(
+        "{}",
+        "Hint: Press ctrl+D or ctrl+C to skip providing a texture and use a default instead."
+            .cyan()
+    );
+
+    #[derive(EnumDisplay, EnumIter)]
+    enum TextureType {
+        Basic,
+        Advanced,
+    }
+    let Ok(res) = Select::new(
+        "What kind of texture are you swizzling?",
+        TextureType::iter().collect(),
+    )
+    .prompt() else {
+        return false;
+    };
+
+    match res {
+        TextureType::Basic => {
+            cli.metallic = prompt_for_texture_path("metallic", true);
+            cli.roughness = prompt_for_texture_path("roughness", true);
+            cli.ao = prompt_for_texture_path("AO", true);
+            cli.emissive = prompt_for_texture_path("emissive", true);
+            cli.basic = true;
+        }
+        TextureType::Advanced => {
+            cli.normal = prompt_for_texture_path("normal", true);
+            cli.ao = prompt_for_texture_path("AO", true);
+            cli.roughness = prompt_for_texture_path("roughness", true);
+            cli.advanced = true;
+        }
+    }
+
+    let Some(output_path) = prompt_for_texture_path("output", false) else {
+        write_err("Output file required");
+        return false;
+    };
+
+    cli.output = output_path;
+
+    true
+}
+
 pub fn main() {
-    let cli = Cli::parse();
+    let mut cli = if std::env::args().skip(1).count() == 0 {
+        Cli {
+            interactive: true,
+            ..Cli::default()
+        }
+    } else {
+        Cli::parse()
+    };
+
+    if cli.interactive && !interactive_cli(&mut cli) {
+        exit(0);
+    }
+
     let textures = assemble_textures(&cli);
 
     let image_format = ImageFormat::from_path(&cli.output).unwrap_or_else(|e| {
-        let extension = cli
-            .output
-            .extension()
-            .map(|ext| ext.to_string_lossy())
-            .unwrap_or("Unknown file type".into());
-        write_err(&format!(
-            "This program does not support writing '{}' files: {e}",
-            extension
-        ));
-        exit(1);
+        write_warning(&format!("'{}': {e}", cli.output.display()));
+        write_warning("Assuming PNG output format");
+
+        cli.output = cli.output.with_added_extension("png");
+        ImageFormat::Png
     });
 
     if cli.output.exists() && !cli.overwrite {
@@ -357,5 +476,11 @@ pub fn main() {
     } else {
         write_err("Do not know which texture to swizzle to!");
         exit(1)
+    }
+
+    if cli.interactive {
+        println!("Output written to '{}'", cli.output.display());
+        println!("Press enter to exit.");
+        std::io::stdin().read_line(&mut String::new()).unwrap();
     }
 }
