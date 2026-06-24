@@ -2,6 +2,8 @@ use image::{GrayImage, Luma, Rgb, RgbImage, Rgba, RgbaImage, imageops};
 use newtype::NewType;
 use std::cmp::max;
 
+const DEFAULT_TEXTURE_DIM: u32 = 64;
+
 pub fn max_dimensions(dims: &[(u32, u32)]) -> (u32, u32) {
     if dims.is_empty() {
         panic!("Empty image array passed to max_dimensions()");
@@ -84,7 +86,7 @@ impl NormalMap {
 
 impl Default for NormalMap {
     fn default() -> Self {
-        let default = RgbImage::from_fn(256, 256, |_, _| Rgb([128, 128, 255]));
+        let default = RgbImage::from_fn(DEFAULT_TEXTURE_DIM, DEFAULT_TEXTURE_DIM, |_, _| Rgb([128, 128, 255]));
 
         NormalMap(default)
     }
@@ -103,7 +105,7 @@ pub struct MetallicMap(pub GrayImage);
 pub struct EmissiveMap(pub GrayImage);
 
 pub fn default_pbr_channel(value: u8) -> GrayImage {
-    GrayImage::from_fn(256, 256, |_, _| Luma([value]))
+    GrayImage::from_fn(DEFAULT_TEXTURE_DIM, DEFAULT_TEXTURE_DIM, |_, _| Luma([value]))
 }
 
 #[derive(NewType)]
